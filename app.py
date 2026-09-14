@@ -57,9 +57,17 @@ with col_ingreso:
         "¿Afecta la producción?", ["Sí", "No"], horizontal=True
     )
 
+    cc_opciones = {}
+
     if afecta_prod == "No":
-      imputaciones_finales.append(("102", 100.0))
-      st.info("Imputación directa a: **102 - INSTITUCIONAL COOPE** (100%)")
+      st.subheader("Selecciona los Centros de Costo involucrados:")
+      cc_opciones = {
+          "102": "102 - INSTITUCIONAL COOPE",
+          "103": "103 - TALLER",
+          "1": "1 - ADMINISTRACION",
+          "4": "4 - FINANCIACION",
+          "5": "5 - IMPUESTOS Y SERVICIOS",
+      }
     else:
       bodega_servicio = st.radio(
           "Selecciona la Bodega afectada:",
@@ -67,7 +75,6 @@ with col_ingreso:
           horizontal=True,
       )
 
-      # Mapeo de Centros de Costo
       cc_comunes = {
           "1": "1 - ADMINISTRACION",
           "4": "4 - FINANCIACION",
@@ -107,73 +114,80 @@ with col_ingreso:
 
       st.subheader("Selecciona los Centros de Costo involucrados:")
 
-      c1, c2 = st.columns(2)
-      cc_seleccionados = []
-      keys_cc = list(cc_opciones.keys())
-      mitad = (len(keys_cc) + 1) // 2
+    # Despliegue dinámico de casilleros sin límite de selección
+    c1, c2 = st.columns(2)
+    cc_seleccionados = []
+    keys_cc = list(cc_opciones.keys())
+    mitad = (len(keys_cc) + 1) // 2
 
-      with c1:
-        for k in keys_cc[:mitad]:
-          if st.checkbox(cc_opciones[k], key=f"chk_serv_{k}"):
-            cc_seleccionados.append(k)
-      with c2:
-        for k in keys_cc[mitad:]:
-          if st.checkbox(cc_opciones[k], key=f"chk_serv_{k}"):
-            cc_seleccionados.append(k)
+    with c1:
+      for k in keys_cc[:mitad]:
+        if st.checkbox(cc_opciones[k], key=f"chk_serv_{k}"):
+          cc_seleccionados.append(k)
+    with c2:
+      for k in keys_cc[mitad:]:
+        if st.checkbox(cc_opciones[k], key=f"chk_serv_{k}"):
+          cc_seleccionados.append(k)
 
-      if len(cc_seleccionados) > 0:
-        pct_defecto = round(100.0 / len(cc_seleccionados), 2)
-        st.markdown("---")
-        st.subheader("Ajuste de Porcentajes por Centro de Costo")
-        st.caption(
-            "Los porcentajes se dividen equitativamente. Puedes modificarlos"
-            " manualmente si lo deseas."
+    if len(cc_seleccionados) > 0:
+      pct_defecto = round(100.0 / len(cc_seleccionados), 2)
+      st.markdown("---")
+      st.subheader("Ajuste de Porcentajes por Centro de Costo")
+      st.caption(
+          "Los % se dividen equitativamente. Si modificas los costos"
+          " específicos, el sobrante ajusta automáticamente en el CC General."
+      )
+
+      # Identificar si hay un CC General seleccionado para que absorba el ajuste
+      generales_prioridad = ["101", "201", "301", "102"]
+      cc_general_presente = None
+      for g in generales_prioridad:
+        if g in cc_seleccionados:
+          cc_general_presente = g
+          break
+
+      # Captura de porcentajes ingresados
+      pct_ingresados = {}
+      for cc_code in cc_seleccionados:
+        nombre_cc = CC_DICT[cc_code]
+        pct_val = st.number_input(
+            f"% para {cc_code} - {nombre_cc}",
+            min_value=0.0,
+            max_value=100.0,
+            value=pct_defecto,
+            step=1.0,
+            key=f"pct_{cc_code}_{len(cc_seleccionados)}",
+        )
+        pct_ingresados[cc_code] = pct_val
+
+      # Cálculo de suma y ajuste automático sobre el CC General
+      suma_otros = sum(
+          v
+          for k, v in pct_ingresados.items()
+          if k != cc_general_presente
+      )
+
+      if cc_general_presente and len(cc_seleccionados) > 1:
+        saldo_general = round(max(0.0, 100.0 - suma_otros), 2)
+        pct_ingresados[cc_general_presente] = saldo_general
+        st.info(
+            f"ℹ️ El CC General **{cc_general_presente} -"
+            f" {CC_DICT[cc_general_presente]}** se ajustó automáticamente a"
+            f" **{saldo_general:.2f}%** para completar el 100%."
         )
 
-        pct_ingresados = {}
-        for cc_code in cc_seleccionados:
-          nombre_cc = CC_DICT[cc_code]
-          pct_val = st.number_input(
-              f"% para {cc_code} - {nombre_cc}",
-              min_value=0.0,
-              max_value=100.0,
-              value=pct_defecto,
-              step=1.0,
-              key=f"pct_{cc_code}_{len(cc_seleccionados)}",
-          )
-          pct_ingresados[cc_code] = pct_val
+      suma_total = round(sum(pct_ingresados.values()), 2)
 
-        suma_pct = sum(pct_ingresados.values())
-
-        if suma_pct > 100.001:
-          st.error(
-              f"⚠️ La suma de porcentajes excede el 100% (Actual: {suma_pct:.2f}%)."
-              " Por favor ajusta los valores."
-          )
-        else:
-          diferencia = round(100.0 - suma_pct, 2)
-          if diferencia > 0.001:
-            if "101" in cc_seleccionados:
-              cc_ajuste = "101"
-            elif "201" in cc_seleccionados:
-              cc_ajuste = "201"
-            elif "301" in cc_seleccionados:
-              cc_ajuste = "301"
-            else:
-              cc_ajuste = cc_seleccionados[0]
-
-            pct_ingresados[cc_ajuste] = round(
-                pct_ingresados.get(cc_ajuste, 0.0) + diferencia, 2
-            )
-            st.warning(
-                f"ℹ️ Se ajustó un **{diferencia:.2f}%** sobrante a **{cc_ajuste}"
-                f" - {CC_DICT[cc_ajuste]}** para completar el 100%."
-            )
-
-          for cc_code, val in pct_ingresados.items():
-            imputaciones_finales.append((cc_code, val))
+      if suma_total > 100.0:
+        st.error(
+            f"⚠️ La suma de porcentajes excede el 100% (Actual:"
+            f" {suma_total:.2f}%). Por favor ajusta los valores."
+        )
       else:
-        st.warning("⚠️ Selecciona al menos un Centro de Costo.")
+        for cc_code, val in pct_ingresados.items():
+          imputaciones_finales.append((cc_code, val))
+    else:
+      st.warning("⚠️ Selecciona al menos un Centro de Costo.")
 
   elif tipo_gasto == "Insumo Bodega":
     adiciona_vino = st.radio(
