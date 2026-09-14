@@ -39,14 +39,40 @@ with col_ingreso:
   with col_f1:
     nro_factura = st.text_input("N° Factura / Proveedor", "F-0001-00001234")
   with col_f2:
-    monto_sin_iva = st.number_input(
-        "Monto sin IVA ($)", min_value=0.0, value=100000.0, step=1000.0
+    monto_ingresado = st.number_input(
+        "Monto Factura ($)", min_value=0.0, value=121000.0, step=1000.0
+    )
+
+  st.subheader("Descuento de IVA:")
+  c_iva1, c_iva2 = st.columns(2)
+  with c_iva1:
+    iva_21 = st.checkbox("IVA 21%", value=True, key="chk_iva_21")
+  with c_iva2:
+    iva_105 = st.checkbox("IVA 10.5%", value=False, key="chk_iva_105")
+
+  # Cálculo del monto Neto sin IVA
+  monto_sin_iva = monto_ingresado
+  tasa_aplicada = 0.0
+
+  if iva_21 and not iva_105:
+    monto_sin_iva = round(monto_ingresado / 1.21, 2)
+    tasa_aplicada = 21.0
+  elif iva_105 and not iva_21:
+    monto_sin_iva = round(monto_ingresado / 1.105, 2)
+    tasa_aplicada = 10.5
+  elif iva_21 and iva_105:
+    st.warning("⚠️ Selecciona solo un tipo de IVA. Se mantendrá el monto total.")
+
+  if tasa_aplicada > 0:
+    st.info(
+        f"💡 **Monto Neto sin IVA ({tasa_aplicada}%):**"
+        f" **${monto_sin_iva:,.2f}**"
     )
 
   st.header("2. Árbol de Decisiones")
   tipo_gasto = st.radio(
       "¿Qué tipo de comprobante es?",
-      ["Servicio", "Insumo Bodega"],
+      ["Servicio", "Herramienta / Maquinaria", "Insumo Bodega"],
       horizontal=True,
   )
 
@@ -54,8 +80,9 @@ with col_ingreso:
   cc_opciones = {}
   prefix_key = "serv"
 
-  if tipo_gasto == "Servicio":
-    prefix_key = "serv"
+  # Servicio y Herramienta/Maquinaria comparten exactamente el mismo flujo
+  if tipo_gasto in ["Servicio", "Herramienta / Maquinaria"]:
+    prefix_key = "serv_hram"
     afecta_prod = st.radio(
         "¿Afecta la producción?", ["Sí", "No"], horizontal=True
     )
@@ -159,7 +186,7 @@ with col_ingreso:
 
       st.subheader("Selecciona centro de costo de destino:")
 
-  # Lógica común de despliegue, prorrateo y ajuste
+  # Despliegue de casilleros
   c1, c2 = st.columns(2)
   cc_seleccionados = []
   keys_cc = list(cc_opciones.keys())
@@ -235,7 +262,7 @@ with col_resultado:
   if imputaciones_finales:
     data_res = []
     for cc_code, pct in imputaciones_finales:
-      monto_imputado = monto_sin_iva * (pct / 100.0)
+      monto_imputado = round(monto_sin_iva * (pct / 100.0), 2)
       nombre_cc = CC_DICT.get(cc_code, "DESCONOCIDO")
       data_res.append({
           "Código CC": cc_code,
