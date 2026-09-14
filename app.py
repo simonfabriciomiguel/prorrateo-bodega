@@ -51,13 +51,14 @@ with col_ingreso:
   )
 
   imputaciones_finales = []
+  cc_opciones = {}
+  prefix_key = "serv"
 
   if tipo_gasto == "Servicio":
+    prefix_key = "serv"
     afecta_prod = st.radio(
         "¿Afecta la producción?", ["Sí", "No"], horizontal=True
     )
-
-    cc_opciones = {}
 
     if afecta_prod == "No":
       st.subheader("Selecciona los Centros de Costo involucrados:")
@@ -114,107 +115,31 @@ with col_ingreso:
 
       st.subheader("Selecciona los Centros de Costo involucrados:")
 
-    # Despliegue dinámico de casilleros sin límite de selección
-    c1, c2 = st.columns(2)
-    cc_seleccionados = []
-    keys_cc = list(cc_opciones.keys())
-    mitad = (len(keys_cc) + 1) // 2
-
-    with c1:
-      for k in keys_cc[:mitad]:
-        if st.checkbox(cc_opciones[k], key=f"chk_serv_{k}"):
-          cc_seleccionados.append(k)
-    with c2:
-      for k in keys_cc[mitad:]:
-        if st.checkbox(cc_opciones[k], key=f"chk_serv_{k}"):
-          cc_seleccionados.append(k)
-
-    if len(cc_seleccionados) > 0:
-      pct_defecto = round(100.0 / len(cc_seleccionados), 2)
-      st.markdown("---")
-      st.subheader("Ajuste de Porcentajes por Centro de Costo")
-      st.caption(
-          "Los % se dividen equitativamente. Si modificas los costos"
-          " específicos, el sobrante ajusta automáticamente en el CC General."
-      )
-
-      # Identificar si hay un CC General seleccionado para que absorba el ajuste
-      generales_prioridad = ["101", "201", "301", "102"]
-      cc_general_presente = None
-      for g in generales_prioridad:
-        if g in cc_seleccionados:
-          cc_general_presente = g
-          break
-
-      # Captura de porcentajes ingresados
-      pct_ingresados = {}
-      for cc_code in cc_seleccionados:
-        nombre_cc = CC_DICT[cc_code]
-        pct_val = st.number_input(
-            f"% para {cc_code} - {nombre_cc}",
-            min_value=0.0,
-            max_value=100.0,
-            value=pct_defecto,
-            step=1.0,
-            key=f"pct_{cc_code}_{len(cc_seleccionados)}",
-        )
-        pct_ingresados[cc_code] = pct_val
-
-      # Cálculo de suma y ajuste automático sobre el CC General
-      suma_otros = sum(
-          v
-          for k, v in pct_ingresados.items()
-          if k != cc_general_presente
-      )
-
-      if cc_general_presente and len(cc_seleccionados) > 1:
-        saldo_general = round(max(0.0, 100.0 - suma_otros), 2)
-        pct_ingresados[cc_general_presente] = saldo_general
-        st.info(
-            f"ℹ️ El CC General **{cc_general_presente} -"
-            f" {CC_DICT[cc_general_presente]}** se ajustó automáticamente a"
-            f" **{saldo_general:.2f}%** para completar el 100%."
-        )
-
-      suma_total = round(sum(pct_ingresados.values()), 2)
-
-      if suma_total > 100.0:
-        st.error(
-            f"⚠️ La suma de porcentajes excede el 100% (Actual:"
-            f" {suma_total:.2f}%). Por favor ajusta los valores."
-        )
-      else:
-        for cc_code, val in pct_ingresados.items():
-          imputaciones_finales.append((cc_code, val))
-    else:
-      st.warning("⚠️ Selecciona al menos un Centro de Costo.")
-
   elif tipo_gasto == "Insumo Bodega":
+    prefix_key = "ins"
     adiciona_vino = st.radio(
         "¿Adiciona a Vino / Mosto?", ["Sí", "No"], horizontal=True
     )
 
     if adiciona_vino == "No":
-      destino_insumo = st.radio(
-          "Selecciona destino del insumo:",
-          ["Bodega Corralitos", "Bodega 3 de Mayo", "Ambas Bodegas"],
-          horizontal=True,
-      )
-      if destino_insumo == "Bodega Corralitos":
-        imputaciones_finales.append(("201", 100.0))
-      elif destino_insumo == "Bodega 3 de Mayo":
-        imputaciones_finales.append(("301", 100.0))
-      else:
-        imputaciones_finales.append(("101", 100.0))
+      st.subheader("Selecciona los Centros de Costo involucrados:")
+      cc_opciones = {
+          "101": "101 - GENERAL AMBAS BODEGAS",
+          "102": "102 - INSTITUCIONAL COOPE",
+          "103": "103 - TALLER",
+          "1": "1 - ADMINISTRACION",
+          "201": "201 - GENERAL CORRALITOS",
+          "301": "301 - GENERAL 3 DE MAYO",
+      }
     else:
-      bodega_vino = st.radio(
+      bodega_insumo = st.radio(
           "Selecciona Bodega de destino:",
           ["Corralitos", "3 de Mayo"],
           horizontal=True,
       )
 
-      if bodega_vino == "Corralitos":
-        opciones_vino = {
+      if bodega_insumo == "Corralitos":
+        cc_opciones = {
             "202": "202 - BLANCO GENERICO CORRALITOS",
             "203": "203 - BLANCO VARIETAL CORRALITOS",
             "204": "204 - TINTO GENERICO CORRALITOS",
@@ -222,7 +147,7 @@ with col_ingreso:
             "206": "206 - MOSTO CORRALITOS",
         }
       else:
-        opciones_vino = {
+        cc_opciones = {
             "302": "302 - BLANCO GENERICO 3DE MAYO",
             "303": "303 - BLANCO VARIETAL 3DE MAYO",
             "304": "304 - TINTO GENERICO 3DE MAYO",
@@ -230,12 +155,77 @@ with col_ingreso:
             "306": "306 - MOSTO 3DE MAYO",
         }
 
-      cc_vino = st.selectbox(
-          "Selecciona el producto específico:",
-          list(opciones_vino.keys()),
-          format_func=lambda x: opciones_vino[x],
+      st.subheader("Selecciona los productos de destino:")
+
+  # Lógica común de despliegue, prorrateo y ajuste
+  c1, c2 = st.columns(2)
+  cc_seleccionados = []
+  keys_cc = list(cc_opciones.keys())
+  mitad = (len(keys_cc) + 1) // 2
+
+  with c1:
+    for k in keys_cc[:mitad]:
+      if st.checkbox(cc_opciones[k], key=f"chk_{prefix_key}_{k}"):
+        cc_seleccionados.append(k)
+  with c2:
+    for k in keys_cc[mitad:]:
+      if st.checkbox(cc_opciones[k], key=f"chk_{prefix_key}_{k}"):
+        cc_seleccionados.append(k)
+
+  if len(cc_seleccionados) > 0:
+    pct_defecto = round(100.0 / len(cc_seleccionados), 2)
+    st.markdown("---")
+    st.subheader("Ajuste de Porcentajes por Centro de Costo")
+    st.caption(
+        "Los % se dividen equitativamente. Si modificas los costos específicos,"
+        " el sobrante ajusta automáticamente en el CC General."
+    )
+
+    generales_prioridad = ["101", "201", "301", "102"]
+    cc_general_presente = None
+    for g in generales_prioridad:
+      if g in cc_seleccionados:
+        cc_general_presente = g
+        break
+
+    pct_ingresados = {}
+    for cc_code in cc_seleccionados:
+      nombre_cc = CC_DICT[cc_code]
+      pct_val = st.number_input(
+          f"% para {cc_code} - {nombre_cc}",
+          min_value=0.0,
+          max_value=100.0,
+          value=pct_defecto,
+          step=1.0,
+          key=f"pct_{prefix_key}_{cc_code}_{len(cc_seleccionados)}",
       )
-      imputaciones_finales.append((cc_vino, 100.0))
+      pct_ingresados[cc_code] = pct_val
+
+    suma_otros = sum(
+        v for k, v in pct_ingresados.items() if k != cc_general_presente
+    )
+
+    if cc_general_presente and len(cc_seleccionados) > 1:
+      saldo_general = round(max(0.0, 100.0 - suma_otros), 2)
+      pct_ingresados[cc_general_presente] = saldo_general
+      st.info(
+          f"ℹ️ El CC General **{cc_general_presente} -"
+          f" {CC_DICT[cc_general_presente]}** se ajustó automáticamente a"
+          f" **{saldo_general:.2f}%** para completar el 100%."
+      )
+
+    suma_total = round(sum(pct_ingresados.values()), 2)
+
+    if suma_total > 100.0:
+      st.error(
+          f"⚠️ La suma de porcentajes excede el 100% (Actual: {suma_total:.2f}%)."
+          " Por favor ajusta los valores."
+      )
+    else:
+      for cc_code, val in pct_ingresados.items():
+        imputaciones_finales.append((cc_code, val))
+  else:
+    st.warning("⚠️ Selecciona al menos un Centro de Costo.")
 
 with col_resultado:
   st.header("3. Cuadro de Imputación Resultante")
