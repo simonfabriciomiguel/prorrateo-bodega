@@ -122,7 +122,7 @@ with col_ingreso:
     )
 
     if adiciona_vino == "No":
-      st.subheader("Selecciona los Centros de Costo involucrados:")
+      st.subheader("Selecciona centro de costo de destino:")
       cc_opciones = {
           "101": "101 - GENERAL AMBAS BODEGAS",
           "102": "102 - INSTITUCIONAL COOPE",
@@ -140,6 +140,7 @@ with col_ingreso:
 
       if bodega_insumo == "Corralitos":
         cc_opciones = {
+            "201": "201 - GENERAL CORRALITOS",
             "202": "202 - BLANCO GENERICO CORRALITOS",
             "203": "203 - BLANCO VARIETAL CORRALITOS",
             "204": "204 - TINTO GENERICO CORRALITOS",
@@ -148,6 +149,7 @@ with col_ingreso:
         }
       else:
         cc_opciones = {
+            "301": "301 - GENERAL 3 DE MAYO",
             "302": "302 - BLANCO GENERICO 3DE MAYO",
             "303": "303 - BLANCO VARIETAL 3DE MAYO",
             "304": "304 - TINTO GENERICO 3DE MAYO",
@@ -155,7 +157,7 @@ with col_ingreso:
             "306": "306 - MOSTO 3DE MAYO",
         }
 
-      st.subheader("Selecciona los productos de destino:")
+      st.subheader("Selecciona centro de costo de destino:")
 
   # Lógica común de despliegue, prorrateo y ajuste
   c1, c2 = st.columns(2)
