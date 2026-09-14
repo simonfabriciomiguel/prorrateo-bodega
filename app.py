@@ -1,8 +1,3 @@
-# 1. Instalamos streamlit
-!pip install streamlit pandas -q
-
-# 2. Guardamos la app
-app_code = """
 import streamlit as st
 import pandas as pd
 
