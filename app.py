@@ -50,33 +50,42 @@ with col_ingreso:
             imputaciones_finales.append(("102", 100.0))
             st.info("Imputación directa a: **102 - INSTITUCIONAL COOPE** (100%)")
         else:
-            st.subheader("Selecciona los Centros de Costo involucrados:")
+            bodega_servicio = st.radio("Selecciona la Bodega afectada:", ["Bodega Corralitos", "Bodega 3 de Mayo", "Ambas Bodegas"], horizontal=True)
             
-            # Filtramos los CC disponibles para Servicios que afectan producción
-            cc_opciones_servicios = {
+            # Definir opciones de CC según la bodega seleccionada
+            cc_comunes = {
                 "1": "1 - ADMINISTRACION",
                 "4": "4 - FINANCIACION",
                 "5": "5 - IMPUESTOS Y SERVICIOS",
-                "101": "101 - GENERAL AMBAS BODEGAS",
-                "103": "103 - TALLER",
-                "201": "201 - GENERAL CORRALITOS",
-                "301": "301 - GENERAL 3 DE MAYO"
+                "103": "103 - TALLER"
             }
             
-            # Desplegamos casillas de verificación directas para cada CC
+            if bodega_servicio == "Bodega Corralitos":
+                cc_opciones = {"201": "201 - GENERAL CORRALITOS", **cc_comunes}
+            elif bodega_servicio == "Bodega 3 de Mayo":
+                cc_opciones = {"301": "301 - GENERAL 3 DE MAYO", **cc_comunes}
+            else:
+                cc_opciones = {
+                    "101": "101 - GENERAL AMBAS BODEGAS",
+                    "201": "201 - GENERAL CORRALITOS",
+                    "301": "301 - GENERAL 3 DE MAYO",
+                    **cc_comunes
+                }
+
+            st.subheader("Selecciona los Centros de Costo involucrados:")
+            
             c1, c2 = st.columns(2)
             cc_seleccionados = []
-            
-            keys_cc = list(cc_opciones_servicios.keys())
+            keys_cc = list(cc_opciones.keys())
             mitad = (len(keys_cc) + 1) // 2
             
             with c1:
                 for k in keys_cc[:mitad]:
-                    if st.checkbox(cc_opciones_servicios[k], key=f"chk_{k}"):
+                    if st.checkbox(cc_opciones[k], key=f"chk_serv_{k}"):
                         cc_seleccionados.append(k)
             with c2:
                 for k in keys_cc[mitad:]:
-                    if st.checkbox(cc_opciones_servicios[k], key=f"chk_{k}"):
+                    if st.checkbox(cc_opciones[k], key=f"chk_serv_{k}"):
                         cc_seleccionados.append(k)
 
             if len(cc_seleccionados) > 0:
@@ -88,7 +97,6 @@ with col_ingreso:
                 pct_ingresados = {}
                 for cc_code in cc_seleccionados:
                     nombre_cc = CC_DICT[cc_code]
-                    # Clave dinámica dependiente de la cantidad de seleccionados para forzar el recálculo equitativo
                     pct_val = st.number_input(
                         f"% para {cc_code} - {nombre_cc}",
                         min_value=0.0,
@@ -106,7 +114,6 @@ with col_ingreso:
                 else:
                     diferencia = round(100.0 - suma_pct, 2)
                     if diferencia > 0.001:
-                        # Asignar resto al CC General adecuado si existe
                         if "101" in cc_seleccionados:
                             cc_ajuste = "101"
                         elif "201" in cc_seleccionados:
